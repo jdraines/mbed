@@ -1,0 +1,27 @@
+[project]
+name = "mbed"
+version = "0.1.0"
+description = "Minimal embeddings with vector search"
+readme = "README.md"
+authors = [
+    { name = "John Raines", email = "johndanielraines@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "llama-index-core>=0.10.0",
+    "llama-index-embeddings-huggingface>=0.2.0",
+    "llama-index-vector-stores-chroma>=0.1.0",
+    "chromadb>=0.4.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+]
+
+[project.scripts]
+mbed = "mbed:main"
+
+[build-system]
+requires = ["uv_build>=0.9.11,<0.10.0"]
+build-backend = "uv_build"
