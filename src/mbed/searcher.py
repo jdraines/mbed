@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 
 from .index_manager import IndexManager
@@ -6,7 +7,15 @@ from .index_manager import IndexManager
 logger = logging.getLogger(__name__)
 
 
-def search_directory(directory: Path, query: str, top_k: int | None = None):
+@dataclass(frozen=True)
+class SearchResult:
+    """A search result with file path and similarity score."""
+
+    file_path: str
+    score: float
+
+
+def search_directory(directory: Path, query: str, top_k: int | None = None) -> list[SearchResult]:
     """
     Perform vector search in an indexed directory.
 
@@ -16,7 +25,7 @@ def search_directory(directory: Path, query: str, top_k: int | None = None):
         top_k: Override number of results (uses metadata default if None)
 
     Returns:
-        Query response with relevant documents
+        Deduplicated list of SearchResult objects with file_path and similarity score
     """
     # Load index manager
     manager = IndexManager(directory)
@@ -27,8 +36,21 @@ def search_directory(directory: Path, query: str, top_k: int | None = None):
 
     logger.info(f"Searching for: {query}")
 
-    # Perform query
-    query_engine = manager.index.as_query_engine(similarity_top_k=top_k)
-    response = query_engine.query(query)
+    # Perform retrieval
+    retriever = manager.index.as_retriever(similarity_top_k=top_k)
+    nodes = retriever.retrieve(query)
 
-    return response
+    # Extract file paths and scores, deduplicate by file_path
+    seen = {}
+    for node_with_score in nodes:
+        file_path = node_with_score.node.metadata.get("file_path")
+        score = node_with_score.score
+        if file_path:
+            # Keep the highest score for each file_path
+            if file_path not in seen or score > seen[file_path]:
+                seen[file_path] = score
+
+    # Convert to list of SearchResult objects
+    results = [SearchResult(file_path=path, score=score) for path, score in seen.items()]
+
+    return results

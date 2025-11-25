@@ -1037,6 +1037,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "chromadb" },
+    { name = "click" },
     { name = "llama-index-core" },
     { name = "llama-index-embeddings-huggingface" },
     { name = "llama-index-vector-stores-chroma" },
@@ -1050,6 +1051,7 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "chromadb", specifier = ">=0.4.0" },
+    { name = "click", specifier = ">=8.0" },
     { name = "llama-index-core", specifier = ">=0.10.0" },
     { name = "llama-index-embeddings-huggingface", specifier = ">=0.2.0" },
     { name = "llama-index-vector-stores-chroma", specifier = ">=0.1.0" },

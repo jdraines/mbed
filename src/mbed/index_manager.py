@@ -5,6 +5,7 @@ from typing import Literal
 
 import chromadb
 from llama_index.core import (
+    Settings,
     SimpleDirectoryReader,
     StorageContext,
     VectorStoreIndex,
@@ -18,7 +19,7 @@ from .utils import make_mbed_dir
 
 logger = logging.getLogger(__name__)
 
-StorageType = Literal["chromadb"]
+StorageType = Literal["chromadb", "simple"]
 
 
 class IndexManager:
@@ -48,8 +49,15 @@ class IndexManager:
         self._metadata = self.metadata_mgr.load_metadata()
 
         model_name = self._metadata["model_name"]
-        logger.debug(f"Loading embedding model {model_name}")
-        self._embed_model = HuggingFaceEmbedding(model_name=model_name)
+
+        # Use Settings.embed_model if already configured (e.g., mock in tests)
+        # Check _embed_model directly to avoid triggering lazy initialization
+        if hasattr(Settings, "_embed_model") and Settings._embed_model is not None:
+            logger.debug("Using configured embed_model from Settings")
+            self._embed_model = Settings._embed_model
+        else:
+            logger.debug(f"Loading embedding model {model_name}")
+            self._embed_model = HuggingFaceEmbedding(model_name=model_name)
 
         logger.debug(f"Loading index for dir {self.mbed_dir}")
         self._index = load_index(self.mbed_dir, self._metadata, self._embed_model)
@@ -60,6 +68,7 @@ class IndexManager:
         model_name: str,
         storage_type: StorageType = "chromadb",
         top_k: int = 3,
+        exclude: list[str] | None = None,
     ) -> None:
         """
         Create a new index with initial documents.
@@ -67,8 +76,9 @@ class IndexManager:
         Args:
             documents: List of documents to index
             model_name: HuggingFace embedding model name
-            storage_type: Vector storage backend type
+            storage_type: Vector storage backend type ("chromadb" or "simple")
             top_k: Default number of search results
+            exclude: List of file patterns to exclude from indexing
 
         Raises:
             ValueError: If directory is already indexed
@@ -85,11 +95,26 @@ class IndexManager:
         logger.info(f"Initializing index with model: {model_name}, storage: {storage_type}")
 
         # Initialize embedding model
-        logger.info("Loading embedding model")
-        self._embed_model = HuggingFaceEmbedding(model_name=model_name)
+        # Use Settings.embed_model if already configured (e.g., mock in tests)
+        # Check _embed_model directly to avoid triggering lazy initialization
+        # Otherwise create a new HuggingFaceEmbedding
+        if hasattr(Settings, "_embed_model") and Settings._embed_model is not None:
+            logger.info("Using configured embed_model from Settings")
+            self._embed_model = Settings._embed_model
+        else:
+            logger.info(f"Loading embedding model: {model_name}")
+            self._embed_model = HuggingFaceEmbedding(model_name=model_name)
 
         # Create vector store based on storage type
-        if storage_type == "chromadb":
+        if storage_type == "simple":
+            logger.info("Creating SimpleVectorStore (in-memory)")
+            logger.info("Building index")
+            self._index = VectorStoreIndex.from_documents(
+                documents,
+                embed_model=self._embed_model,
+                show_progress=True,
+            )
+        elif storage_type == "chromadb":
             logger.info("Creating ChromaDB vector store")
             chroma_client = chromadb.PersistentClient(
                 path=str(self.mbed_dir / "chroma_db")
@@ -116,7 +141,7 @@ class IndexManager:
             "created_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "last_updated": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "indexed_files": {},
-            "config": {"top_k": top_k},
+            "config": {"top_k": top_k, "exclude": exclude or []},
         }
 
     def add_files(self, file_paths: list[Path]) -> dict:

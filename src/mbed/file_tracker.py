@@ -18,6 +18,34 @@ class FileChange:
     new_mtime: float | None = None
 
 
+def _should_exclude(file_path: Path, directory: Path, exclude_patterns: list[str]) -> bool:
+    """
+    Check if a file should be excluded based on patterns.
+
+    Args:
+        file_path: Absolute path to the file
+        directory: Root directory being indexed
+        exclude_patterns: List of glob patterns to exclude
+
+    Returns:
+        True if file should be excluded, False otherwise
+    """
+    if not exclude_patterns:
+        return False
+
+    rel_path = file_path.relative_to(directory)
+
+    for pattern in exclude_patterns:
+        # Check if the pattern matches the relative path
+        if rel_path.match(pattern):
+            return True
+        # Also check if any parent directory matches
+        if any(part == pattern or Path(part).match(pattern) for part in rel_path.parts):
+            return True
+
+    return False
+
+
 def detect_changes(directory: Path) -> dict[str, list[FileChange]]:
     """
     Detect file changes in indexed directory.
@@ -37,6 +65,7 @@ def detect_changes(directory: Path) -> dict[str, list[FileChange]]:
     metadata_mgr = MetadataManager(mbed_dir)
     metadata = metadata_mgr.load_metadata()
     indexed_files = metadata["indexed_files"]
+    exclude_patterns = metadata.get("config", {}).get("exclude", [])
 
     changes: dict[str, list[FileChange]] = {
         "added": [],
@@ -48,6 +77,10 @@ def detect_changes(directory: Path) -> dict[str, list[FileChange]]:
     current_files = {}
     for file_path in directory.rglob("*"):
         if file_path.is_file() and not str(file_path).startswith(str(mbed_dir)):
+            # Skip excluded files
+            if _should_exclude(file_path, directory, exclude_patterns):
+                continue
+
             rel_path = str(file_path.relative_to(directory))
             stat = file_path.stat()
             current_files[rel_path] = {

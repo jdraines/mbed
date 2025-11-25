@@ -8,7 +8,7 @@ from .index_manager import IndexManager
 
 logger = logging.getLogger(__name__)
 
-StorageType = Literal["chromadb"]
+StorageType = Literal["chromadb", "simple"]
 
 
 def create_index(
@@ -16,6 +16,7 @@ def create_index(
     model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
     storage_type: StorageType = "chromadb",
     top_k: int = 3,
+    exclude: list[str] | None = None,
 ):
     """
     Create initial index of all documents in a directory.
@@ -23,7 +24,7 @@ def create_index(
     Args:
         directory: Path to directory to index
         model_name: HuggingFace embedding model name
-        storage_type: "chromadb" (more types can be added later)
+        storage_type: "chromadb" or "simple" (in-memory)
         top_k: Number of results to return in searches
 
     Returns:
@@ -32,9 +33,12 @@ def create_index(
     logger.info(f"Indexing directory: {directory}")
     logger.info(f"Using model: {model_name}, storage: {storage_type}")
 
+    exclude = exclude or []
+    exclude.append(".mbed")
+
     # Load documents
     reader = SimpleDirectoryReader(
-        input_dir=str(directory), recursive=True, exclude=[".mbed"]
+        input_dir=str(directory), recursive=True, exclude=exclude
     )
     documents = reader.load_data()
 
@@ -52,7 +56,7 @@ def create_index(
 
     # Create and initialize index manager
     manager = IndexManager(directory)
-    manager.initialize(documents, model_name, storage_type, top_k)
+    manager.initialize(documents, model_name, storage_type, top_k, exclude)
 
     # Update metadata with indexed files (pass documents to capture doc_ids)
     manager.update_file_metadata(file_paths, documents)

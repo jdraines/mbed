@@ -1,22 +1,28 @@
 """End-to-end CLI integration tests."""
 
+import json
+import os
 import time
+
+import pytest
 
 
 def test_init_search_workflow(tmp_test_dir, create_test_documents, run_cli_command):
     """
     Test the primary user workflow: init a directory, then search it.
+    Tests plumbing only - does not verify semantic search quality.
     """
     # Create test documents
     docs = {
         "python.txt": "Python is a versatile programming language used for web development",
         "rust.txt": "Rust is a systems programming language focused on safety",
         "go.txt": "Go is designed for building scalable network services",
+        "secret.env": "SECRET_KEY=my_secret_value",
     }
     create_test_documents(tmp_test_dir, docs)
 
-    # Run mbed init
-    result = run_cli_command(["init", str(tmp_test_dir)])
+    # Run mbed init with exclude pattern for .env files
+    result = run_cli_command(["init", "-d", str(tmp_test_dir), "--exclude", "*.env"])
 
     # Verify init succeeded
     assert result["returncode"] == 0
@@ -24,18 +30,27 @@ def test_init_search_workflow(tmp_test_dir, create_test_documents, run_cli_comma
     assert (tmp_test_dir / ".mbed" / "metadata.json").exists()
     assert "Index created" in result["stdout"]
 
-    # Run mbed search
-    result = run_cli_command(["search", str(tmp_test_dir), "systems programming"])
+    # Verify the .env file was excluded from indexing
+    metadata_path = tmp_test_dir / ".mbed" / "metadata.json"
+    metadata = json.loads(metadata_path.read_text())
+    indexed_files = metadata["indexed_files"]
+    assert "secret.env" not in indexed_files
+    assert "python.txt" in indexed_files
+    assert "rust.txt" in indexed_files
+    assert "go.txt" in indexed_files
 
-    # Verify search succeeded
+    # Run mbed search
+    result = run_cli_command(["search", "systems programming", "-d", str(tmp_test_dir)])
+
+    # Verify search succeeded (returns results, not checking quality)
     assert result["returncode"] == 0
-    # Should find content related to "systems programming" (likely Rust)
-    assert "Rust" in result["stdout"] or "systems" in result["stdout"].lower()
+    assert len(result["stdout"]) > 0  # Got some output
 
 
 def test_init_update_search_workflow(tmp_test_dir, create_test_documents, run_cli_command):
     """
     Test the incremental update workflow: init, add files, update, search.
+    Tests plumbing only - does not verify semantic search quality.
     """
     # Create initial documents
     initial_docs = {
@@ -45,7 +60,7 @@ def test_init_update_search_workflow(tmp_test_dir, create_test_documents, run_cl
     create_test_documents(tmp_test_dir, initial_docs)
 
     # Init
-    result = run_cli_command(["init", str(tmp_test_dir)])
+    result = run_cli_command(["init", "-d", str(tmp_test_dir)])
     assert result["returncode"] == 0
 
     # Add a new file
@@ -54,21 +69,18 @@ def test_init_update_search_workflow(tmp_test_dir, create_test_documents, run_cl
     new_file.write_text("This document discusses machine learning and neural networks")
 
     # Run mbed update with auto-confirm
-    result = run_cli_command(["update", str(tmp_test_dir), "-y"])
+    result = run_cli_command(["update", "-d", str(tmp_test_dir), "-y"])
 
     # Verify update succeeded
     assert result["returncode"] == 0
     assert "Index updated successfully" in result["stdout"] or "Processed" in result["stdout"]
 
-    # Search for content from the new file
-    result = run_cli_command(["search", str(tmp_test_dir), "machine learning"])
+    # Search for content from the new file (just verify search works)
+    result = run_cli_command(["search", "machine learning", "-d", str(tmp_test_dir)])
 
-    # Verify search finds the new content
+    # Verify search returns results
     assert result["returncode"] == 0
-    assert (
-        "machine learning" in result["stdout"].lower()
-        or "neural" in result["stdout"].lower()
-    )
+    assert len(result["stdout"]) > 0  # Got some output
 
 
 def test_status_command_reports_changes(tmp_test_dir, create_test_documents, run_cli_command):
@@ -83,7 +95,7 @@ def test_status_command_reports_changes(tmp_test_dir, create_test_documents, run
     }
     create_test_documents(tmp_test_dir, initial_docs)
 
-    result = run_cli_command(["init", str(tmp_test_dir)])
+    result = run_cli_command(["init", "-d", str(tmp_test_dir)])
     assert result["returncode"] == 0
 
     # Make changes
@@ -113,7 +125,8 @@ def test_status_command_reports_changes(tmp_test_dir, create_test_documents, run
 
 def test_file_deletion_end_to_end(tmp_test_dir, create_test_documents, run_cli_command):
     """
-    Test complete file deletion workflow: deleted files don't appear in search.
+    Test complete file deletion workflow: init, delete file, update.
+    Tests plumbing only - does not verify semantic search quality.
     """
     # Create documents including one with "secret" content
     docs = {
@@ -124,31 +137,60 @@ def test_file_deletion_end_to_end(tmp_test_dir, create_test_documents, run_cli_c
     create_test_documents(tmp_test_dir, docs)
 
     # Init
-    result = run_cli_command(["init", str(tmp_test_dir)])
+    result = run_cli_command(["init", "-d", str(tmp_test_dir)])
     assert result["returncode"] == 0
 
-    # Verify "secret" is searchable
-    result = run_cli_command(["search", str(tmp_test_dir), "secret information"])
+    # Verify search works
+    result = run_cli_command(["search", "secret information", "-d", str(tmp_test_dir)])
     assert result["returncode"] == 0
-    original_output = result["stdout"]
-    assert "secret" in original_output.lower() or "confidential" in original_output.lower()
 
     # Delete the secret file
     time.sleep(0.1)
     (tmp_test_dir / "secret.txt").unlink()
 
     # Update index with auto-confirm
-    result = run_cli_command(["update", str(tmp_test_dir), "-y"])
+    result = run_cli_command(["update", "-d", str(tmp_test_dir), "-y"])
     assert result["returncode"] == 0
     assert "Removed" in result["stdout"] or "deleted" in result["stdout"].lower()
 
-    # Search for "secret" again - should not appear strongly
-    result = run_cli_command(["search", str(tmp_test_dir), "secret information"])
+    # Verify search still works after deletion
+    result = run_cli_command(["search", "public information", "-d", str(tmp_test_dir)])
+    assert result["returncode"] == 0
+    assert len(result["stdout"]) > 0  # Got some output
+
+
+@pytest.mark.skipif(
+    not os.getenv("MBED_USE_REAL_EMBEDDINGS"),
+    reason="Real embedding test only runs when MBED_USE_REAL_EMBEDDINGS is set",
+)
+def test_semantic_search_with_real_embeddings(
+    tmp_test_dir, create_test_documents, run_cli_command_subprocess
+):
+    """
+    Integration test with real embeddings to verify semantic search quality.
+    Only runs when MBED_USE_REAL_EMBEDDINGS=1 is set.
+
+    This test is slower but verifies that semantic search actually works.
+    Uses subprocess to ensure realistic end-to-end testing.
+    """
+    # Create test documents with clear semantic distinctions
+    docs = {
+        "rust.txt": "Rust is a systems programming language that focuses on safety and performance",
+        "python.txt": "Python is a high-level interpreted language great for scripting",
+        "cooking.txt": "Baking bread requires flour, water, yeast, and patience",
+    }
+    create_test_documents(tmp_test_dir, docs)
+
+    # Init
+    result = run_cli_command_subprocess(["init", "-d", str(tmp_test_dir)])
     assert result["returncode"] == 0
 
-    # The response should be different - either no results or different content
-    # We can't guarantee "secret" won't appear at all (could be in the query echo),
-    # but we can verify the public document is still searchable
-    result = run_cli_command(["search", str(tmp_test_dir), "public information"])
+    # Search for systems programming - should find Rust
+    result = run_cli_command_subprocess(["search", "systems programming", "-d", str(tmp_test_dir), ])
     assert result["returncode"] == 0
-    assert "public" in result["stdout"].lower()
+    assert "rust" in result["stdout"].lower() or "safety" in result["stdout"].lower()
+
+    # Search for baking - should find cooking document
+    result = run_cli_command_subprocess(["search", "baking recipes", "-d", str(tmp_test_dir)])
+    assert result["returncode"] == 0
+    assert "bread" in result["stdout"].lower() or "flour" in result["stdout"].lower()
