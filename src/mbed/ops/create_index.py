@@ -4,7 +4,7 @@ from typing import Literal
 
 from llama_index.core import SimpleDirectoryReader
 
-from .index_manager import IndexManager
+from ..index_manager import IndexManager
 
 logger = logging.getLogger(__name__)
 
@@ -67,3 +67,4 @@ def create_index(
     )
 
     return manager
+

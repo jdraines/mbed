@@ -1,6 +1,32 @@
 import json
+from typing import Literal
 from pathlib import Path
 from typing import Any
+
+from pydantic import BaseModel, ConfigDict
+
+
+class FileMetadata(BaseModel):
+    path: str
+    mtime: float
+    size: int
+    doc_ids: list[str]
+    indexed_at: str
+
+
+class MetadataConfig(BaseModel):
+    top_k: int
+    exclude: list[str]
+
+
+class Metadata(BaseModel):
+    model_config = ConfigDict(protected_namespaces=[])
+    model_name: str
+    storage_type: Literal["chromadb", "simple"]
+    created_at: str
+    last_updated: str
+    indexed_files: dict[str, FileMetadata]
+    config: MetadataConfig
 
 
 class MetadataManager:
@@ -23,7 +49,10 @@ class MetadataManager:
             )
 
         with open(self.metadata_file, "r") as f:
-            return json.load(f)
+            metadata = json.load(f)
+
+        Metadata.model_validate(metadata)  # type: ignore
+        return metadata
 
     def metadata_exists(self) -> bool:
         """Check if metadata file exists."""

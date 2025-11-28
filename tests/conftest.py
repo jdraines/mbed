@@ -11,7 +11,7 @@ from llama_index.core import Settings
 from llama_index.core.embeddings import BaseEmbedding
 from llama_index.core.llms import MockLLM
 
-from mbed.indexer import create_index
+from mbed.ops import create_index
 
 
 class FastMockEmbedding(BaseEmbedding):

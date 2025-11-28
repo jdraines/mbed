@@ -4,13 +4,15 @@ from pathlib import Path
 
 import click
 
-from . import cli
-from ..indexer import create_index
-from ..searcher import search_directory
-from ..file_tracker import detect_changes, update_index
+from ..ops import (
+    create_index,
+    search_directory,
+    update_index
+)
+from ..file_tracking import detect_changes
 
 
-@cli.command()
+@click.command()
 @click.option("--directory", "-d", type=click.Path(path_type=Path), default=".")
 @click.option(
     "--model",
@@ -37,7 +39,7 @@ def init(directory, model, storage, top_k, exclude):
     click.echo(f"Index created at {directory / '.mbed'}")
 
 
-@cli.command()
+@click.command()
 @click.argument("query")
 @click.option("--directory", "-d", type=click.Path(path_type=Path), default=".")
 @click.option("--top-k", type=int, default=None, help="Override number of results")
@@ -48,7 +50,7 @@ def search(directory, query, top_k):
     click.echo(response)
 
 
-@cli.command()
+@click.command()
 @click.option("--directory", "-d", type=click.Path(path_type=Path), default=".")
 @click.option("-y", "--yes", is_flag=True, help="Auto-confirm changes")
 def update(directory, yes):
@@ -115,7 +117,8 @@ def update(directory, yes):
         click.echo(f"\nRemoved {deleted_count} deleted file(s) from index.")
 
 
-@cli.command()
+
+@click.command()
 @click.argument("directory", type=click.Path(path_type=Path), default=".")
 def status(directory):
     """Check for file changes."""

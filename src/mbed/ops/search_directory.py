@@ -2,7 +2,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-from .index_manager import IndexManager
+from ..index_manager import IndexManager
 
 logger = logging.getLogger(__name__)
 

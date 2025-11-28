@@ -45,7 +45,7 @@ class IndexManager:
         if not self.mbed_dir.exists():
             raise ValueError(f"Directory {self.directory} is not indexed.")
 
-        logger.info("Loading existing index")
+        logger.debug("Loading existing index")
         self._metadata = self.metadata_mgr.load_metadata()
 
         model_name = self._metadata["model_name"]
@@ -92,30 +92,30 @@ class IndexManager:
         # Create .mbed directory
         make_mbed_dir(self.directory)
 
-        logger.info(f"Initializing index with model: {model_name}, storage: {storage_type}")
+        logger.debug(f"Initializing index with model: {model_name}, storage: {storage_type}")
 
         # Initialize embedding model
         # Use Settings.embed_model if already configured (e.g., mock in tests)
         # Check _embed_model directly to avoid triggering lazy initialization
         # Otherwise create a new HuggingFaceEmbedding
         if hasattr(Settings, "_embed_model") and Settings._embed_model is not None:
-            logger.info("Using configured embed_model from Settings")
+            logger.debug("Using configured embed_model from Settings")
             self._embed_model = Settings._embed_model
         else:
-            logger.info(f"Loading embedding model: {model_name}")
+            logger.debug(f"Loading embedding model: {model_name}")
             self._embed_model = HuggingFaceEmbedding(model_name=model_name)
 
         # Create vector store based on storage type
         if storage_type == "simple":
-            logger.info("Creating SimpleVectorStore (in-memory)")
-            logger.info("Building index")
+            logger.debug("Creating SimpleVectorStore (in-memory)")
+            logger.debug("Building index")
             self._index = VectorStoreIndex.from_documents(
                 documents,
                 embed_model=self._embed_model,
                 show_progress=True,
             )
         elif storage_type == "chromadb":
-            logger.info("Creating ChromaDB vector store")
+            logger.debug("Creating ChromaDB vector store")
             chroma_client = chromadb.PersistentClient(
                 path=str(self.mbed_dir / "chroma_db")
             )
@@ -124,7 +124,7 @@ class IndexManager:
 
             storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
-            logger.info("Building index")
+            logger.debug("Building index")
             self._index = VectorStoreIndex.from_documents(
                 documents,
                 storage_context=storage_context,
@@ -162,7 +162,7 @@ class IndexManager:
         if self._index is None or self._metadata is None:
             raise ValueError("Index not loaded. Call load() or initialize() first.")
 
-        logger.info(f"Adding {len(file_paths)} files to index")
+        logger.debug(f"Adding {len(file_paths)} files to index")
 
         errors = []
         processed = 0
@@ -269,7 +269,7 @@ class IndexManager:
         if self._index is None or self._metadata is None:
             raise ValueError("Index not loaded. Call load() or initialize() first.")
 
-        logger.info(f"Removing {len(file_paths)} files from index")
+        logger.debug(f"Removing {len(file_paths)} files from index")
 
         errors = []
         removed = 0
@@ -331,7 +331,7 @@ class IndexManager:
         if self._metadata is None:
             raise ValueError("No metadata to save.")
 
-        logger.info("Saving metadata")
+        logger.debug("Saving metadata")
         self.metadata_mgr.save_metadata(self._metadata)
 
     @property

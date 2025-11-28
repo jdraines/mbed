@@ -2,7 +2,7 @@
 
 import time
 
-from mbed.file_tracker import detect_changes
+from mbed.file_tracking import detect_changes
 
 
 def test_detect_new_files(tmp_test_dir, create_indexed_directory):
