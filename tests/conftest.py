@@ -12,6 +12,8 @@ from llama_index.core.embeddings import BaseEmbedding
 from llama_index.core.llms import MockLLM
 
 from mbed.ops import create_index
+from click.testing import CliRunner
+from mbed.cli import cli
 
 
 class FastMockEmbedding(BaseEmbedding):
@@ -109,8 +111,6 @@ def run_cli_command():
     Returns:
         Function that runs CLI commands and returns results
     """
-    from click.testing import CliRunner
-    from mbed.cli import cli
 
     runner = CliRunner()
 

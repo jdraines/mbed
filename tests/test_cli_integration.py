@@ -5,6 +5,7 @@ import os
 import time
 
 import pytest
+from mbed.metadata import Metadata
 
 
 def test_init_search_workflow(tmp_test_dir, create_test_documents, run_cli_command):
@@ -32,8 +33,8 @@ def test_init_search_workflow(tmp_test_dir, create_test_documents, run_cli_comma
 
     # Verify the .env file was excluded from indexing
     metadata_path = tmp_test_dir / ".mbed" / "metadata.json"
-    metadata = json.loads(metadata_path.read_text())
-    indexed_files = metadata["indexed_files"]
+    metadata = Metadata(**json.loads(metadata_path.read_text()))
+    indexed_files = metadata.indexed_files
     assert "secret.env" not in indexed_files
     assert "python.txt" in indexed_files
     assert "rust.txt" in indexed_files

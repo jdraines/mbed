@@ -32,7 +32,7 @@ def search_directory(directory: Path, query: str, top_k: int | None = None) -> l
     manager.load()
 
     if top_k is None:
-        top_k = manager.metadata.get("config", {}).get("top_k", 3)
+        top_k = manager.metadata.config.top_k
 
     logger.info(f"Searching for: {query}")
 

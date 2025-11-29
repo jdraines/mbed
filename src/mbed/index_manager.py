@@ -14,7 +14,7 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.chroma import ChromaVectorStore
 
 from .loaders import load_index
-from .metadata import MetadataManager
+from .metadata import MetadataManager, Metadata, FileMetadata
 from .utils import make_mbed_dir
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ class IndexManager:
 
         self._index = None
         self._embed_model = None
-        self._metadata = None
+        self._metadata: Metadata = None
 
     def load(self) -> None:
         """Load existing index and metadata."""
@@ -48,7 +48,7 @@ class IndexManager:
         logger.debug("Loading existing index")
         self._metadata = self.metadata_mgr.load_metadata()
 
-        model_name = self._metadata["model_name"]
+        model_name = self._metadata.model_name
 
         # Use Settings.embed_model if already configured (e.g., mock in tests)
         # Check _embed_model directly to avoid triggering lazy initialization
@@ -134,15 +134,14 @@ class IndexManager:
         else:
             raise ValueError(f"Unsupported storage type: {storage_type}")
 
-        # Initialize metadata
-        self._metadata = {
-            "model_name": model_name,
-            "storage_type": storage_type,
-            "created_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-            "last_updated": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-            "indexed_files": {},
-            "config": {"top_k": top_k, "exclude": exclude or []},
-        }
+        self._metadata = Metadata(
+            model_name=model_name,
+            storage_type=storage_type,
+            created_at=datetime.now(UTC),
+            last_updated=datetime.now(UTC),
+            indexed_files={},
+            config={"top_k": top_k, "exclude": exclude or []},
+        )
 
     def add_files(self, file_paths: list[Path]) -> dict:
         """
@@ -171,10 +170,8 @@ class IndexManager:
             try:
                 # If file was previously indexed, delete old version first
                 rel_path = str(file_path.relative_to(self.directory))
-                if rel_path in self._metadata["indexed_files"]:
-                    old_doc_ids = self._metadata["indexed_files"][rel_path].get(
-                        "doc_ids", []
-                    )
+                if rel_path in self._metadata.indexed_files:
+                    old_doc_ids = self._metadata.indexed_files[rel_path].doc_ids
                     for doc_id in old_doc_ids:
                         try:
                             self._index.delete_ref_doc(doc_id, delete_from_docstore=True)
@@ -194,13 +191,13 @@ class IndexManager:
 
                 # Update metadata with new doc IDs
                 stat = file_path.stat()
-                self._metadata["indexed_files"][rel_path] = {
-                    "path": str(file_path),
-                    "mtime": stat.st_mtime,
-                    "size": stat.st_size,
-                    "doc_ids": doc_ids,
-                    "indexed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-                }
+                self._metadata.indexed_files[rel_path] = FileMetadata(
+                    path=str(file_path),
+                    mtime=stat.st_mtime,
+                    size=stat.st_size,
+                    doc_ids=doc_ids,
+                    indexed_at=datetime.now(UTC)
+                )
                 processed += 1
                 logger.debug(f"Indexed {file_path.name} with {len(doc_ids)} doc(s)")
             except Exception as e:
@@ -209,7 +206,7 @@ class IndexManager:
                 logger.error(f"Error indexing {file_path}: {error_msg}")
 
         # Update last_updated timestamp
-        self._metadata["last_updated"] = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        self._metadata.last_updated = datetime.now(UTC)
 
         return {
             "processed": processed,
@@ -246,13 +243,13 @@ class IndexManager:
                 if file_path in doc_map:
                     doc_ids = [doc.doc_id for doc in doc_map[file_path]]
 
-                self._metadata["indexed_files"][rel_path] = {
-                    "path": str(file_path),
-                    "mtime": stat.st_mtime,
-                    "size": stat.st_size,
-                    "doc_ids": doc_ids,
-                    "indexed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-                }
+                self._metadata.indexed_files[rel_path] = FileMetadata(
+                    path=file_path,
+                    mtime=stat.st_mtime,
+                    size=stat.st_size,
+                    doc_ids=doc_ids,
+                    indexed_at=datetime.now(UTC)
+                )
 
     def remove_files(self, file_paths: list[Path]) -> dict:
         """
@@ -277,9 +274,9 @@ class IndexManager:
         for file_path in file_paths:
             try:
                 rel_path = str(file_path.relative_to(self.directory))
-                if rel_path in self._metadata["indexed_files"]:
+                if rel_path in self._metadata.indexed_files:
                     # Get document IDs and delete from vector store
-                    doc_ids = self._metadata["indexed_files"][rel_path].get("doc_ids", [])
+                    doc_ids = self._metadata.indexed_files[rel_path].doc_ids
 
                     for doc_id in doc_ids:
                         try:
@@ -289,7 +286,7 @@ class IndexManager:
                             logger.warning(f"Could not delete doc_id {doc_id}: {e}")
 
                     # Remove from metadata
-                    del self._metadata["indexed_files"][rel_path]
+                    del self._metadata.indexed_files[rel_path]
                     removed += 1
                     logger.debug(f"Removed {file_path.name} from index")
                 else:
@@ -299,7 +296,7 @@ class IndexManager:
                 errors.append((file_path, error_msg))
                 logger.error(f"Error removing {file_path}: {error_msg}")
 
-        self._metadata["last_updated"] = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        self._metadata.last_updated = datetime.now(UTC)
 
         return {
             "removed": removed,
@@ -321,10 +318,10 @@ class IndexManager:
 
         for file_path in file_paths:
             rel_path = str(file_path.relative_to(self.directory))
-            if rel_path in self._metadata["indexed_files"]:
-                del self._metadata["indexed_files"][rel_path]
+            if rel_path in self._metadata.indexed_files:
+                del self._metadata.indexed_files[rel_path]
 
-        self._metadata["last_updated"] = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        self._metadata.last_updated = datetime.now(UTC)
 
     def save_metadata(self) -> None:
         """Save current metadata to disk."""

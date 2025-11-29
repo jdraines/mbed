@@ -2,7 +2,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-from .metadata import MetadataManager
+from .metadata import FileMetadata, MetadataManager
 
 
 logger = logging.getLogger(__name__)
@@ -64,8 +64,9 @@ def detect_changes(directory: Path) -> dict[str, list[FileChange]]:
     # Load metadata
     metadata_mgr = MetadataManager(mbed_dir)
     metadata = metadata_mgr.load_metadata()
-    indexed_files = metadata["indexed_files"]
-    exclude_patterns = metadata.get("config", {}).get("exclude", [])
+    indexed_files = metadata.indexed_files
+    config = metadata.config
+    exclude_patterns = config.exclude
 
     changes: dict[str, list[FileChange]] = {
         "added": [],
@@ -83,34 +84,33 @@ def detect_changes(directory: Path) -> dict[str, list[FileChange]]:
 
             rel_path = str(file_path.relative_to(directory))
             stat = file_path.stat()
-            current_files[rel_path] = {
-                "path": file_path,
-                "mtime": stat.st_mtime,
-                "size": stat.st_size,
-            }
-
+            current_files[rel_path] = FileMetadata(
+                path=str(file_path),
+                mtime=stat.st_mtime,
+                size=stat.st_size,
+            )
     # Check for added and modified files
     for rel_path, file_info in current_files.items():
         if rel_path not in indexed_files:
             changes["added"].append(
                 FileChange(
-                    path=file_info["path"],
+                    path=file_info.path,
                     change_type="added",
-                    new_mtime=file_info["mtime"],
+                    new_mtime=file_info.mtime,
                 )
             )
         else:
-            old_mtime = indexed_files[rel_path]["mtime"]
-            new_mtime = file_info["mtime"]
+            old_mtime = indexed_files[rel_path].mtime
+            new_mtime = file_info.mtime
 
             # Check if modified (compare mtime and size)
             if (
                 new_mtime != old_mtime
-                or file_info["size"] != indexed_files[rel_path]["size"]
+                or file_info.size != indexed_files[rel_path].size
             ):
                 changes["modified"].append(
                     FileChange(
-                        path=file_info["path"],
+                        path=file_info.path,
                         change_type="modified",
                         old_mtime=old_mtime,
                         new_mtime=new_mtime,
@@ -122,9 +122,9 @@ def detect_changes(directory: Path) -> dict[str, list[FileChange]]:
         if rel_path not in current_files:
             changes["deleted"].append(
                 FileChange(
-                    path=Path(file_info["path"]),
+                    path=Path(file_info.path),
                     change_type="deleted",
-                    old_mtime=file_info["mtime"],
+                    old_mtime=file_info.mtime,
                 )
             )
 

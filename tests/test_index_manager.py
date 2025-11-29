@@ -2,6 +2,8 @@
 
 from mbed.index_manager import IndexManager
 
+from llama_index.core import SimpleDirectoryReader
+
 
 def test_initialize_and_load_roundtrip(tmp_test_dir, create_test_documents):
     """
@@ -38,11 +40,11 @@ def test_initialize_and_load_roundtrip(tmp_test_dir, create_test_documents):
     manager2.load()
 
     # Verify metadata loaded correctly
-    assert manager2.metadata["model_name"] == "sentence-transformers/all-MiniLM-L6-v2"
-    assert manager2.metadata["storage_type"] == "chromadb"
-    assert len(manager2.metadata["indexed_files"]) == 2
-    assert "doc1.txt" in manager2.metadata["indexed_files"]
-    assert "doc2.txt" in manager2.metadata["indexed_files"]
+    assert manager2.metadata.model_name == "sentence-transformers/all-MiniLM-L6-v2"
+    assert manager2.metadata.storage_type == "chromadb"
+    assert len(manager2.metadata.indexed_files) == 2
+    assert "doc1.txt" in manager2.metadata.indexed_files
+    assert "doc2.txt" in manager2.metadata.indexed_files
 
     # Verify we can query the loaded index
     query_engine = manager2.index.as_query_engine(similarity_top_k=1)
@@ -87,10 +89,9 @@ def test_add_files_captures_doc_ids(tmp_test_dir, create_test_documents):
     # Verify doc_ids were captured
     manager.save_metadata()
     metadata = manager.metadata
-    assert "new1.txt" in metadata["indexed_files"]
-    assert "new2.txt" in metadata["indexed_files"]
-    assert "doc_ids" in metadata["indexed_files"]["new1.txt"]
-    assert len(metadata["indexed_files"]["new1.txt"]["doc_ids"]) > 0
+    assert "new1.txt" in metadata.indexed_files
+    assert "new2.txt" in metadata.indexed_files
+    assert len(metadata.indexed_files["new1.txt"].doc_ids) > 0
 
     # Verify files are searchable
     query_engine = manager.index.as_query_engine(similarity_top_k=1)
@@ -108,7 +109,6 @@ def test_update_existing_file_removes_old_version(tmp_test_dir, create_test_docu
     docs = {"update_test.txt": "This is version one of the document"}
     create_test_documents(tmp_test_dir, docs)
 
-    from llama_index.core import SimpleDirectoryReader
 
     reader = SimpleDirectoryReader(input_dir=str(tmp_test_dir))
     documents = reader.load_data()
@@ -148,7 +148,7 @@ def test_update_existing_file_removes_old_version(tmp_test_dir, create_test_docu
     response_text3 = str(response3).lower()
     # The response should not strongly match "version one" since we deleted it
     # This is a bit fuzzy, but the key is that version two is now in the index
-    assert manager2.metadata["indexed_files"]["update_test.txt"]["doc_ids"]
+    assert manager2.metadata.indexed_files["update_test.txt"].doc_ids
 
 
 def test_remove_files_deletes_from_vector_store(tmp_test_dir, create_test_documents):
@@ -191,8 +191,8 @@ def test_remove_files_deletes_from_vector_store(tmp_test_dir, create_test_docume
     manager2.save_metadata()
 
     # Verify it's removed from metadata
-    assert "remove.txt" not in manager2.metadata["indexed_files"]
-    assert "keep.txt" in manager2.metadata["indexed_files"]
+    assert "remove.txt" not in manager2.metadata.indexed_files
+    assert "keep.txt" in manager2.metadata.indexed_files
 
     # Verify "secret information" is no longer searchable
     query_engine2 = manager2.index.as_query_engine(similarity_top_k=2)
@@ -244,4 +244,4 @@ def test_error_handling_during_add_files(tmp_test_dir, create_test_documents):
     manager2.save_metadata()
     if result["processed"] > 0:
         # Valid file should be in metadata
-        assert "valid.txt" in manager2.metadata["indexed_files"]
+        assert "valid.txt" in manager2.metadata.indexed_files

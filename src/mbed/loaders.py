@@ -17,7 +17,7 @@ def load_index(mbed_dir: Path, metadata: dict, embed_model):
     Returns:
         VectorStoreIndex instance
     """
-    storage_type = metadata["storage_type"]
+    storage_type = metadata.storage_type
 
     if storage_type == "chromadb":
         chroma_client = chromadb.PersistentClient(path=str(mbed_dir / "chroma_db"))
