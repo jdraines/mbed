@@ -1,7 +1,7 @@
 mbed
 ===
 
-A CLI for indexing directories for vector search.
+A CLI for indexing directories for vector search built on `llama-index`.
 
 install for dev
 ---
