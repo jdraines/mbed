@@ -1,6 +1,6 @@
 from .create_index import create_index
 from .search_directory import search_directory
-from .update import update_index
+from .update_index import update_index
 
 
 __all___ = [
