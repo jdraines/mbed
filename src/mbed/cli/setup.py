@@ -1,17 +1,11 @@
 """CLI for mbed using Click."""
 
+from functools import wraps
 import logging
 import sys
 
-import click
 from llama_index.core import Settings
 from llama_index.core.llms import MockLLM
-from .commands import (
-    init,
-    search,
-    update,
-    status
-)
 
 
 def setup_logging(verbose: bool = False) -> None:
@@ -30,18 +24,12 @@ def setup_llm() -> None:
     Settings.llm = MockLLM()
 
 
-@click.group()
-@click.option("-v", "--verbose", is_flag=True, help="Enable verbose output")
-@click.pass_context
-def cli(ctx, verbose):
-    """mbed - Minimal Embeddings with Vector Search"""
-    ctx.ensure_object(dict)
-    ctx.obj["verbose"] = verbose
-    setup_logging(verbose)
-    setup_llm()
+def setup(func):
+    @wraps(func)
+    def setup_and_execute(*args, **kwargs):
+        v = "verbose" in kwargs
+        setup_logging(v)
+        setup_llm()
+        return func(*args, **kwargs)
 
-
-cli.add_command(init)
-cli.add_command(search)
-cli.add_command(update)
-cli.add_command(status)
+    return setup_and_execute

@@ -48,7 +48,9 @@ def test_init_search_workflow(tmp_test_dir, create_test_documents, run_cli_comma
     assert len(result["stdout"]) > 0  # Got some output
 
 
-def test_init_update_search_workflow(tmp_test_dir, create_test_documents, run_cli_command):
+def test_init_update_search_workflow(
+    tmp_test_dir, create_test_documents, run_cli_command
+):
     """
     Test the incremental update workflow: init, add files, update, search.
     Tests plumbing only - does not verify semantic search quality.
@@ -74,7 +76,10 @@ def test_init_update_search_workflow(tmp_test_dir, create_test_documents, run_cl
 
     # Verify update succeeded
     assert result["returncode"] == 0
-    assert "Index updated successfully" in result["stdout"] or "Processed" in result["stdout"]
+    assert (
+        "Index updated successfully" in result["stdout"]
+        or "Processed" in result["stdout"]
+    )
 
     # Search for content from the new file (just verify search works)
     result = run_cli_command(["search", "machine learning", "-d", str(tmp_test_dir)])
@@ -84,7 +89,9 @@ def test_init_update_search_workflow(tmp_test_dir, create_test_documents, run_cl
     assert len(result["stdout"]) > 0  # Got some output
 
 
-def test_status_command_reports_changes(tmp_test_dir, create_test_documents, run_cli_command):
+def test_status_command_reports_changes(
+    tmp_test_dir, create_test_documents, run_cli_command
+):
     """
     Test that the status command correctly reports file changes.
     """
@@ -187,11 +194,17 @@ def test_semantic_search_with_real_embeddings(
     assert result["returncode"] == 0
 
     # Search for systems programming - should find Rust
-    result = run_cli_command_subprocess(["search", "systems programming", "-d", str(tmp_test_dir), ])
+    result = run_cli_command_subprocess(
+        ["search", "systems programming", "-d", str(tmp_test_dir), "--top-k", "1"]
+    )
     assert result["returncode"] == 0
-    assert "rust" in result["stdout"].lower() or "safety" in result["stdout"].lower()
+    assert (
+        "rust.txt" in result["stdout"].lower() or "safety" in result["stdout"].lower()
+    )
 
     # Search for baking - should find cooking document
-    result = run_cli_command_subprocess(["search", "baking recipes", "-d", str(tmp_test_dir)])
+    result = run_cli_command_subprocess(
+        ["search", "baking recipes", "-d", str(tmp_test_dir), "--top-k", "1"]
+    )
     assert result["returncode"] == 0
-    assert "bread" in result["stdout"].lower() or "flour" in result["stdout"].lower()
+    assert "cooking.txt" in result["stdout"].lower()

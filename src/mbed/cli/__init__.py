@@ -1,3 +1,12 @@
-from ._cli import cli
+from .cli import app
+from .commands import init, search, status, update
 
-__all__ = ["_cli"]
+
+app.add_typer(init)
+app.add_typer(search)
+app.add_typer(status)
+app.add_typer(update)
+
+
+__all__ = ["app"]
+

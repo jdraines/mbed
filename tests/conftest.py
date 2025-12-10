@@ -12,8 +12,8 @@ from llama_index.core.embeddings import BaseEmbedding
 from llama_index.core.llms import MockLLM
 
 from mbed.ops import create_index
-from click.testing import CliRunner
-from mbed.cli import cli
+from typer.testing import CliRunner
+from mbed.cli import app as cli
 
 
 class FastMockEmbedding(BaseEmbedding):
@@ -91,7 +91,6 @@ def create_indexed_directory(create_test_documents):
         model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
         storage_type: str = "simple",
     ) -> Path:
-
         # Create documents
         create_test_documents(directory, documents)
 
@@ -120,7 +119,7 @@ def run_cli_command():
         return {
             "returncode": result.exit_code,
             "stdout": result.output,
-            "stderr": "",  # Click captures everything in output
+            "stderr": "",
         }
 
     return _run
